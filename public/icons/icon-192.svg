@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-label="Consultas BCRA">
+  <defs>
+    <linearGradient id="bg192" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f5132" />
+      <stop offset="100%" stop-color="#d8b36a" />
+    </linearGradient>
+  </defs>
+  <rect width="192" height="192" rx="40" fill="#071510" />
+  <rect x="14" y="14" width="164" height="164" rx="34" fill="url(#bg192)" />
+  <path d="M45 126V66h46c22 0 35 10 35 28s-13 32-35 32H45Zm24-18h20c9 0 14-5 14-14s-5-12-14-12H69v26Z" fill="#f8f5ec" />
+  <circle cx="136" cy="58" r="16" fill="#f8f5ec" opacity=".18" />
+</svg>

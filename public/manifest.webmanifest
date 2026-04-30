@@ -1,0 +1,26 @@
+{
+  "name": "Consultas BCRA",
+  "short_name": "BCRA",
+  "description": "Consultas mobile-first para Central de Deudores del BCRA.",
+  "theme_color": "#0d3b2a",
+  "background_color": "#071510",
+  "display": "standalone",
+  "start_url": "/",
+  "scope": "/",
+  "lang": "es-AR",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
