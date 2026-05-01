@@ -1,6 +1,14 @@
 import { FormEvent, useEffect, useState } from "react";
+import { API_ORIGIN, API_SERVICE, APP_BASE_URL, APP_VERSION } from "./appMeta";
 import { useBcraQuery } from "./hooks/useBcraQuery";
-import { formatCurrency, formatDate, formatPeriod, getSituationLabel, normalizeIdentification } from "./utils/format";
+import {
+  formatChequeCurrency,
+  formatDate,
+  formatDebtCurrency,
+  formatPeriod,
+  getSituationLabel,
+  normalizeIdentification,
+} from "./utils/format";
 
 type ActiveTab = "actual" | "historica" | "cheques";
 
@@ -10,7 +18,8 @@ function App() {
   const [identification, setIdentification] = useState("");
   const [activeTab, setActiveTab] = useState<ActiveTab>("actual");
   const [recent, setRecent] = useState<string[]>([]);
-  const { loading, error, actual, historica, cheques, run } = useBcraQuery();
+  const { loading, error, actual, historica, cheques, identification: queriedId, run } = useBcraQuery();
+  const displayName = actual?.denominacion ?? historica?.denominacion ?? cheques?.denominacion ?? null;
 
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY);
@@ -49,10 +58,9 @@ function App() {
     <main className="shell">
       <section className="hero">
         <div className="hero__badge">PWA · Open Finance · BCRA</div>
-        <h1>Consultas de deuda para usar desde el celular.</h1>
+        <h1>Consultas BCRA</h1>
         <p>
-          Base inicial para consultar deuda actual, historial y cheques rechazados
-          contra la API oficial del Banco Central.
+          Deuda actual, historial y cheques rechazados desde la Central de Deudores del Banco Central.
         </p>
       </section>
 
@@ -103,11 +111,11 @@ function App() {
       <section className="metrics">
         <article>
           <span>Servicio</span>
-          <strong>Central de Deudores v1.0</strong>
+          <strong>{API_SERVICE}</strong>
         </article>
         <article>
           <span>Origen</span>
-          <strong>api.bcra.gob.ar</strong>
+          <strong>{API_ORIGIN}</strong>
         </article>
         <article>
           <span>Modo</span>
@@ -119,7 +127,7 @@ function App() {
         <div className="results__header">
           <div>
             <span className="eyebrow">Panel</span>
-            <h2>{actual?.denominacion ?? historica?.denominacion ?? cheques?.denominacion ?? "Resultado de consulta"}</h2>
+            <h2>{displayName ?? "Resultado de consulta"}</h2>
           </div>
 
           <nav className="tabs" aria-label="Secciones de resultados">
@@ -147,6 +155,15 @@ function App() {
           </nav>
         </div>
 
+        {displayName && queriedId ? (
+          <div className="summary-card">
+            <span>Titular</span>
+            <strong>{displayName}</strong>
+            <span>CUIT/CUIL/CDI</span>
+            <strong>{queriedId}</strong>
+          </div>
+        ) : null}
+
         {error ? <div className="empty-state error">{error}</div> : null}
         {!error && !actual && !historica && !cheques && !loading ? (
           <div className="empty-state">
@@ -170,7 +187,7 @@ function App() {
                     </div>
                     <div className="entity__grid">
                       <span>Monto</span>
-                      <strong>{formatCurrency(entidad.monto)}</strong>
+                      <strong>{formatDebtCurrency(entidad.monto)}</strong>
                       <span>Atraso</span>
                       <strong>{entidad.diasAtrasoPago} días</strong>
                       <span>Fecha situación 1</span>
@@ -207,7 +224,7 @@ function App() {
                     </div>
                     <div className="entity__grid">
                       <span>Monto</span>
-                      <strong>{formatCurrency(entidad.monto)}</strong>
+                      <strong>{formatDebtCurrency(entidad.monto)}</strong>
                       <span>Revisión</span>
                       <strong>{entidad.enRevision ? "Sí" : "No"}</strong>
                       <span>Judicial</span>
@@ -228,6 +245,7 @@ function App() {
                   <h3>{causal.causal}</h3>
                   <span>{causal.entidades.length} entidades</span>
                 </header>
+                <p>Los montos de cheques rechazados vienen en pesos nominales, no en miles.</p>
                 {causal.entidades.map((entidad) => (
                   <div key={`${causal.causal}-${entidad.entidad}`} className="entity">
                     <div className="entity__top">
@@ -239,13 +257,15 @@ function App() {
                           <span>Cheque</span>
                           <strong>{detalle.nroCheque}</strong>
                           <span>Monto</span>
-                          <strong>{formatCurrency(detalle.monto)}</strong>
+                          <strong>{formatChequeCurrency(detalle.monto)}</strong>
                           <span>Rechazo</span>
                           <strong>{formatDate(detalle.fechaRechazo)}</strong>
                           <span>Pago</span>
                           <strong>{formatDate(detalle.fechaPago)}</strong>
-                          <span>Multa</span>
-                          <strong>{detalle.estadoMulta || "Sin dato"}</strong>
+                          <span>Pago multa</span>
+                          <strong>{formatDate(detalle.fechaPagoMulta)}</strong>
+                          <span>Estado multa</span>
+                          <strong>{detalle.estadoMulta ?? "Pagada o sin estado informado"}</strong>
                         </div>
                         <div className="flags">
                           {detalle.ctaPersonal ? <span>Cuenta personal</span> : null}
@@ -261,6 +281,27 @@ function App() {
             ))}
           </div>
         ) : null}
+
+        {!error && activeTab === "cheques" && !cheques && (actual || historica) ? (
+          <div className="empty-state">
+            No existen registros de cheques rechazados para esta consulta.
+          </div>
+        ) : null}
+      </section>
+
+      <section className="legal-strip">
+        <div>
+          <span className="eyebrow">Info</span>
+          <p>
+            Versión {APP_VERSION}. Esta app consume datos públicos del BCRA y expone
+            el aviso legal en una ventana aparte para consulta rápida.
+          </p>
+        </div>
+        <div className="legal-strip__actions">
+          <a className="secondary-action" href={`${APP_BASE_URL}aviso-legal.html`} target="_blank" rel="noreferrer">
+            Aviso legal
+          </a>
+        </div>
       </section>
     </main>
   );

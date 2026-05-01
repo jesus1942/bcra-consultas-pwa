@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  BcraApiError,
   fetchChequesRechazados,
   fetchDeudaActual,
   fetchDeudaHistorica,
@@ -16,6 +17,7 @@ export interface QueryState {
   actual: DeudaActualResponse | null;
   historica: DeudaHistoricaResponse | null;
   cheques: ChequesRechazadosResponse | null;
+  identification: string | null;
 }
 
 const initialState: QueryState = {
@@ -24,6 +26,7 @@ const initialState: QueryState = {
   actual: null,
   historica: null,
   cheques: null,
+  identification: null,
 };
 
 export function useBcraQuery() {
@@ -34,31 +37,40 @@ export function useBcraQuery() {
       ...current,
       loading: true,
       error: null,
+      identification,
     }));
 
-    try {
-      const [actual, historica, cheques] = await Promise.all([
-        fetchDeudaActual(identification),
-        fetchDeudaHistorica(identification),
-        fetchChequesRechazados(identification),
-      ]);
+    const actualResult = await Promise.allSettled([fetchDeudaActual(identification)]);
+    const historicaResult = await Promise.allSettled([fetchDeudaHistorica(identification)]);
+    const chequesResult = await Promise.allSettled([fetchChequesRechazados(identification)]);
 
-      setState({
-        loading: false,
-        error: null,
-        actual,
-        historica,
-        cheques,
-      });
-    } catch (error) {
-      setState({
-        loading: false,
-        error: error instanceof Error ? error.message : "Falló la consulta.",
-        actual: null,
-        historica: null,
-        cheques: null,
-      });
-    }
+    const actual = actualResult[0].status === "fulfilled" ? actualResult[0].value : null;
+    const historica = historicaResult[0].status === "fulfilled" ? historicaResult[0].value : null;
+    const cheques = chequesResult[0].status === "fulfilled" ? chequesResult[0].value : null;
+
+    const failures = [actualResult[0], historicaResult[0], chequesResult[0]].filter(
+      (result): result is PromiseRejectedResult => result.status === "rejected",
+    );
+
+    const hasAnyData = actual || historica || cheques;
+    const fatalError = failures.find(({ reason }) => !(reason instanceof BcraApiError && reason.status === 404));
+    const firstNotFound = failures.find(({ reason }) => reason instanceof BcraApiError && reason.status === 404);
+
+    setState({
+      loading: false,
+      error:
+        !hasAnyData
+          ? fatalError?.reason instanceof Error
+            ? fatalError.reason.message
+            : firstNotFound?.reason instanceof Error
+              ? firstNotFound.reason.message
+              : null
+          : null,
+      actual,
+      historica,
+      cheques,
+      identification,
+    });
   }
 
   return {

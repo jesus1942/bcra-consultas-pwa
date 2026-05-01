@@ -32,7 +32,8 @@ body {
 }
 
 button,
-input {
+input,
+a {
   font: inherit;
 }
 
@@ -243,6 +244,26 @@ button {
   gap: 0.9rem;
 }
 
+.summary-card {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 1rem;
+  background: rgba(246, 240, 228, 0.05);
+  border: 1px solid rgba(246, 240, 228, 0.08);
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.35rem;
+}
+
+.summary-card span {
+  color: var(--text-soft);
+  font-size: 0.82rem;
+}
+
+.summary-card strong {
+  line-height: 1.35;
+}
+
 .panel {
   padding: 1rem;
   border-radius: 1.15rem;
@@ -346,10 +367,50 @@ button {
   color: #ffe1e0;
 }
 
+.legal-strip {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 1.25rem;
+  background: rgba(8, 23, 18, 0.52);
+  border: 1px solid rgba(246, 240, 228, 0.08);
+  display: grid;
+  gap: 1rem;
+}
+
+.legal-strip p {
+  margin: 0.7rem 0 0;
+  color: var(--text-soft);
+  line-height: 1.55;
+}
+
+.legal-strip__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+}
+
+.secondary-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.9rem;
+  padding: 0.85rem 1rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(216, 179, 106, 0.24);
+  background: rgba(246, 240, 228, 0.05);
+  color: inherit;
+  text-decoration: none;
+  transition:
+    transform 160ms ease,
+    background 160ms ease,
+    opacity 160ms ease;
+}
+
 @media (hover: hover) {
   .search-form button:hover,
   .recent__chip:hover,
-  .tabs button:hover {
+  .tabs button:hover,
+  .secondary-action:hover {
     transform: translateY(-1px);
   }
 }

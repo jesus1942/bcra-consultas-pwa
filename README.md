@@ -20,6 +20,8 @@ npm install
 npm run dev
 ```
 
+En desarrollo, Vite usa un proxy local en `/api/bcra` para evitar problemas de CORS del navegador contra `api.bcra.gob.ar`.
+
 ## Build
 
 ```bash
@@ -28,7 +30,7 @@ npm run build
 
 ## Configuración
 
-Por defecto el frontend consulta `https://api.bcra.gob.ar`.
+En producción, por defecto el frontend consulta `https://api.bcra.gob.ar`.
 
 Si más adelante necesitás pasar por un proxy o backend propio:
 

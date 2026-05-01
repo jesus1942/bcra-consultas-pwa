@@ -6,12 +6,14 @@ import type {
   QueryKind,
 } from "../types/bcra";
 
-const API_BASE = import.meta.env.VITE_BCRA_API_BASE ?? "https://api.bcra.gob.ar";
+const API_BASE =
+  import.meta.env.VITE_BCRA_API_BASE ??
+  (import.meta.env.DEV ? "/api/bcra" : "https://api.bcra.gob.ar");
 
 const endpointByKind: Record<QueryKind, string> = {
-  actual: "/centraldedeudores/v1.0/Deudas",
-  historica: "/centraldedeudores/v1.0/Deudas/Historicas",
-  cheques: "/centraldedeudores/v1.0/Deudas/ChequesRechazados",
+  actual: "/CentralDeDeudores/v1.0/Deudas",
+  historica: "/CentralDeDeudores/v1.0/Deudas/Historicas",
+  cheques: "/CentralDeDeudores/v1.0/Deudas/ChequesRechazados",
 };
 
 const fallbackErrors: Record<number, string> = {
@@ -20,21 +22,72 @@ const fallbackErrors: Record<number, string> = {
   500: "El servicio del BCRA no respondió correctamente.",
 };
 
+export class BcraApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+  ) {
+    super(message);
+    this.name = "BcraApiError";
+  }
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
 async function requestBcra<T>(kind: QueryKind, identification: string): Promise<T> {
   const cleanIdentification = identification.replace(/\D/g, "");
-  const response = await fetch(`${API_BASE}${endpointByKind[kind]}/${cleanIdentification}`);
+  const url = `${API_BASE}${endpointByKind[kind]}/${cleanIdentification}`;
 
-  if (!response.ok) {
-    throw new Error(fallbackErrors[response.status] ?? "No fue posible completar la consulta.");
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    let response: Response;
+
+    try {
+      response = await fetch(url);
+    } catch (error) {
+      if (attempt < 2 && error instanceof TypeError) {
+        await delay(350 * (attempt + 1));
+        continue;
+      }
+
+      if (error instanceof TypeError) {
+        throw new Error("No se pudo conectar con el servicio del BCRA. Probá de nuevo en unos minutos.");
+      }
+
+      throw error;
+    }
+
+    if (response.ok) {
+      const payload = (await response.json()) as ApiEnvelope<T>;
+
+      if (!payload.results) {
+        throw new Error("La respuesta del BCRA llegó sin datos utilizables.");
+      }
+
+      return payload.results;
+    }
+
+    let message = fallbackErrors[response.status] ?? "No fue posible completar la consulta.";
+
+    try {
+      const payload = (await response.json()) as { errorMessages?: string[] };
+      if (payload.errorMessages?.[0]) {
+        message = payload.errorMessages[0];
+      }
+    } catch {
+      // Si el servicio no devuelve JSON utilizable, se conserva el mensaje por status.
+    }
+
+    if (response.status >= 500 && attempt < 2) {
+      await delay(350 * (attempt + 1));
+      continue;
+    }
+
+    throw new BcraApiError(message, response.status);
   }
 
-  const payload = (await response.json()) as ApiEnvelope<T>;
-
-  if (!payload.results) {
-    throw new Error("La respuesta del BCRA llegó sin datos utilizables.");
-  }
-
-  return payload.results;
+  throw new Error("No se pudo completar la consulta al BCRA.");
 }
 
 export function fetchDeudaActual(identification: string) {

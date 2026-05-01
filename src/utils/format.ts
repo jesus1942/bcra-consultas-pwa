@@ -1,9 +1,18 @@
-export function formatCurrency(value: number) {
+export function formatDebtCurrency(value: number) {
   return new Intl.NumberFormat("es-AR", {
     style: "currency",
     currency: "ARS",
     maximumFractionDigits: 0,
   }).format(value * 1000);
+}
+
+export function formatChequeCurrency(value: number) {
+  return new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "ARS",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(value);
 }
 
 export function formatDate(value: string | null) {

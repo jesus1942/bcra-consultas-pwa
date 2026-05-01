@@ -53,9 +53,9 @@ export interface ChequeDetalle {
   monto: number;
   fechaPago: string | null;
   fechaPagoMulta: string | null;
-  estadoMulta: string;
+  estadoMulta: string | null;
   ctaPersonal: boolean;
-  denomJuridica: string;
+  denomJuridica: string | null;
   enRevision: boolean;
   procesoJud: boolean;
 }
