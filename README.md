@@ -43,6 +43,46 @@ Railway usará:
 
 En ese escenario no hace falta definir `VITE_BCRA_API_BASE`, porque la app consume el proxy local `/api/bcra`.
 
+## Backend de estudio
+
+El servidor Node también expone un backend mínimo para probar por consola:
+
+```bash
+npm run start
+```
+
+Endpoints útiles:
+
+- `GET /api/studio/health`
+- `GET /api/studio/summary`
+- `GET /api/studio/clients`
+- `POST /api/studio/clients`
+- `POST /api/studio/clients/{identificacion}/query`
+- `GET /api/studio/clients/{identificacion}/snapshots`
+- `GET /api/studio/jobs`
+- `GET /api/studio/jobs/latest`
+- `POST /api/studio/jobs/daily-refresh`
+
+Los datos se guardan en `data/studio-db.json`.
+
+Cada snapshot guarda:
+
+- una sola foto por cliente y por fecha (`snapshotDate`)
+- normalización automática de snapshots legacy que todavía no tuvieran `snapshotDate`
+- resultados parciales por endpoint (`actual`, `historica`, `cheques`)
+- clasificación del estado general (`partial_or_success`, `maintenance`, `not_found`, `upstream_error`)
+- comparación contra el snapshot diario anterior (`changeSummary`)
+- errores normalizados para distinguir mantenimiento, timeout y resets de conexión
+
+Cada corrida masiva (`daily-refresh`) guarda:
+
+- un `job` persistido en `data/studio-db.json`
+- fecha de inicio y fin
+- cantidad de clientes procesados
+- primer pase más segundo pase para clientes retryables
+- resultado por cliente con `attempts`, `retried` y códigos de estado por endpoint
+- resumen agregado del lote (`successful`, `failed`, `changed`, `retried`, `statusCounts`)
+
 ## Configuración
 
 En producción, por defecto el frontend consulta `https://api.bcra.gob.ar`.

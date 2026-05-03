@@ -2,6 +2,18 @@ import { FormEvent, useEffect, useState } from "react";
 import { API_ORIGIN, API_SERVICE, APP_BASE_URL, APP_VERSION } from "./appMeta";
 import { useBcraQuery } from "./hooks/useBcraQuery";
 import {
+  createStudyClient,
+  deleteStudyClient,
+  fetchStudyClients,
+  fetchStudySummary,
+  Priority,
+  queryStudyClient,
+  runDailyRefreshJob,
+  StudioClient,
+  StudySummary,
+  updateStudyClient,
+} from "./lib/studio";
+import {
   formatChequeCurrency,
   formatDate,
   formatDebtCurrency,
@@ -14,13 +26,72 @@ type ActiveTab = "actual" | "historica" | "cheques";
 
 const STORAGE_KEY = "bcra-consultas-recientes";
 
+function getWorstSituation(actual: ReturnType<typeof useBcraQuery>["actual"]) {
+  if (!actual?.periodos[0]) {
+    return null;
+  }
+
+  return actual.periodos[0].entidades.reduce((max, entity) => Math.max(max, entity.situacion), 0);
+}
+
+function getPriorityLabel(priority: Priority) {
+  const labels: Record<Priority, string> = {
+    normal: "Normal",
+    vigilar: "Vigilar",
+    urgente: "Urgente",
+  };
+
+  return labels[priority];
+}
+
+function formatDateTime(value: string | null) {
+  if (!value) {
+    return "Sin dato";
+  }
+
+  return new Intl.DateTimeFormat("es-AR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
 function App() {
   const [identification, setIdentification] = useState("");
   const [activeTab, setActiveTab] = useState<ActiveTab>("actual");
   const [recent, setRecent] = useState<string[]>([]);
+  const [portfolio, setPortfolio] = useState<StudioClient[]>([]);
+  const [studySummary, setStudySummary] = useState<StudySummary | null>(null);
+  const [studyLoading, setStudyLoading] = useState(true);
+  const [studyError, setStudyError] = useState<string | null>(null);
+  const [studyBusyKey, setStudyBusyKey] = useState<string | null>(null);
   const { loading, error, actual, historica, cheques, identification: queriedId, run } = useBcraQuery();
   const displayName = actual?.denominacion ?? historica?.denominacion ?? cheques?.denominacion ?? null;
   const isMaintenance = error?.toLowerCase().includes("mantenimiento") ?? false;
+  const clientInPortfolio = queriedId ? portfolio.find((client) => client.identification === queriedId) : null;
+
+  async function loadStudyData() {
+    setStudyLoading(true);
+    setStudyError(null);
+
+    try {
+      const [clients, summary] = await Promise.all([fetchStudyClients(), fetchStudySummary()]);
+      setPortfolio(clients);
+      setStudySummary(summary);
+    } catch (studyLoadError) {
+      setStudyError(studyLoadError instanceof Error ? studyLoadError.message : "No se pudo cargar la cartera del estudio.");
+    } finally {
+      setStudyLoading(false);
+    }
+  }
+
+  async function refreshStudySummary() {
+    try {
+      const summary = await fetchStudySummary();
+      setStudySummary(summary);
+    } catch (summaryError) {
+      setStudyError(summaryError instanceof Error ? summaryError.message : "No se pudo actualizar el resumen del estudio.");
+    }
+  }
 
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY);
@@ -34,6 +105,10 @@ function App() {
     } catch {
       window.localStorage.removeItem(STORAGE_KEY);
     }
+  }, []);
+
+  useEffect(() => {
+    loadStudyData();
   }, []);
 
   function persistRecent(nextId: string) {
@@ -53,6 +128,112 @@ function App() {
     setIdentification(cleanId);
     persistRecent(cleanId);
     run(cleanId);
+  }
+
+  async function upsertPortfolioClient(priority: Priority = clientInPortfolio?.priority ?? "normal") {
+    if (!queriedId || !displayName) {
+      return;
+    }
+
+    setStudyBusyKey(`save:${queriedId}`);
+    setStudyError(null);
+
+    try {
+      if (!clientInPortfolio) {
+        await createStudyClient({
+          identification: queriedId,
+          displayName,
+          priority,
+        });
+      } else {
+        await updateStudyClient(queriedId, {
+          displayName,
+          priority,
+        });
+      }
+
+      await queryStudyClient(queriedId);
+      await loadStudyData();
+    } catch (portfolioError) {
+      setStudyError(portfolioError instanceof Error ? portfolioError.message : "No se pudo guardar el cliente en cartera.");
+    } finally {
+      setStudyBusyKey(null);
+    }
+  }
+
+  function updatePortfolioClientLocally(identificationToUpdate: string, updates: Partial<StudioClient>) {
+    setPortfolio((current) => {
+      return current.map((client) =>
+        client.identification === identificationToUpdate ? { ...client, ...updates } : client,
+      );
+    });
+  }
+
+  async function persistPortfolioClient(identificationToUpdate: string, updates: Partial<StudioClient>) {
+    setStudyBusyKey(`update:${identificationToUpdate}`);
+    setStudyError(null);
+
+    try {
+      const updatedClient = await updateStudyClient(identificationToUpdate, {
+        displayName: updates.displayName,
+        notes: updates.notes,
+        priority: updates.priority,
+      });
+      setPortfolio((current) =>
+        current.map((client) => (client.identification === identificationToUpdate ? updatedClient : client)),
+      );
+      await refreshStudySummary();
+    } catch (portfolioError) {
+      setStudyError(portfolioError instanceof Error ? portfolioError.message : "No se pudo actualizar el cliente.");
+      await loadStudyData();
+    } finally {
+      setStudyBusyKey(null);
+    }
+  }
+
+  async function removePortfolioClient(identificationToRemove: string) {
+    setStudyBusyKey(`remove:${identificationToRemove}`);
+    setStudyError(null);
+
+    try {
+      await deleteStudyClient(identificationToRemove);
+      await loadStudyData();
+    } catch (portfolioError) {
+      setStudyError(portfolioError instanceof Error ? portfolioError.message : "No se pudo quitar el cliente.");
+    } finally {
+      setStudyBusyKey(null);
+    }
+  }
+
+  async function requeryPortfolioClient(identificationToQuery: string) {
+    setIdentification(identificationToQuery);
+    persistRecent(identificationToQuery);
+    run(identificationToQuery);
+    setStudyBusyKey(`query:${identificationToQuery}`);
+    setStudyError(null);
+
+    try {
+      await queryStudyClient(identificationToQuery);
+      await loadStudyData();
+    } catch (portfolioError) {
+      setStudyError(portfolioError instanceof Error ? portfolioError.message : "No se pudo reconsultar el cliente en cartera.");
+    } finally {
+      setStudyBusyKey(null);
+    }
+  }
+
+  async function handleDailyRefresh() {
+    setStudyBusyKey("daily-refresh");
+    setStudyError(null);
+
+    try {
+      await runDailyRefreshJob();
+      await loadStudyData();
+    } catch (refreshError) {
+      setStudyError(refreshError instanceof Error ? refreshError.message : "No se pudo ejecutar la actualización diaria.");
+    } finally {
+      setStudyBusyKey(null);
+    }
   }
 
   return (
@@ -162,6 +343,16 @@ function App() {
             <strong>{displayName}</strong>
             <span>CUIT/CUIL/CDI</span>
             <strong>{queriedId}</strong>
+            <div className="summary-card__actions">
+              <button
+                type="button"
+                className="secondary-action"
+                onClick={() => upsertPortfolioClient()}
+                disabled={studyBusyKey === `save:${queriedId}`}
+              >
+                {clientInPortfolio ? "Actualizar cartera" : "Agregar a cartera"}
+              </button>
+            </div>
           </div>
         ) : null}
 
@@ -325,6 +516,141 @@ function App() {
             Aviso legal
           </a>
         </div>
+      </section>
+
+      <section className="results">
+        <div className="results__header">
+          <div>
+            <span className="eyebrow">Estudio</span>
+            <h2>Cartera de clientes</h2>
+          </div>
+          <div className="summary-card__actions">
+            <button
+              type="button"
+              className="secondary-action"
+              onClick={handleDailyRefresh}
+              disabled={studyBusyKey === "daily-refresh" || portfolio.length === 0}
+            >
+              {studyBusyKey === "daily-refresh" ? "Actualizando..." : "Refresh diario"}
+            </button>
+          </div>
+        </div>
+
+        {studySummary ? (
+          <div className="study-overview">
+            <article className="study-overview__card">
+              <span>Clientes</span>
+              <strong>{studySummary.clientCount}</strong>
+            </article>
+            <article className="study-overview__card">
+              <span>Snapshots</span>
+              <strong>{studySummary.snapshotCount}</strong>
+            </article>
+            <article className="study-overview__card">
+              <span>Urgentes</span>
+              <strong>{studySummary.urgent}</strong>
+            </article>
+            <article className="study-overview__card">
+              <span>Último refresh</span>
+              <strong>{studySummary.latestJob?.finishedAt ? formatDateTime(studySummary.latestJob.finishedAt) : "Sin correr"}</strong>
+            </article>
+          </div>
+        ) : null}
+
+        {studySummary?.latestJob ? (
+          <div className="empty-state">
+            Última corrida: {studySummary.latestJob.summary?.successful ?? 0} correctos,{" "}
+            {studySummary.latestJob.summary?.failed ?? 0} fallidos,{" "}
+            {studySummary.latestJob.summary?.retried ?? 0} reintentados.
+          </div>
+        ) : null}
+
+        {studyError ? <div className="empty-state error">{studyError}</div> : null}
+        {studyLoading ? (
+          <div className="empty-state">Cargando cartera y resumen del estudio...</div>
+        ) : portfolio.length === 0 ? (
+          <div className="empty-state">
+            Cuando consultes un CUIT, podés guardarlo en cartera con prioridad, notas internas y última revisión.
+          </div>
+        ) : (
+          <div className="portfolio-grid">
+            {portfolio.map((client) => (
+              <article key={client.identification} className="portfolio-card">
+                <div className="portfolio-card__top">
+                  <div>
+                    <strong>{client.displayName ?? "Cliente sin nombre"}</strong>
+                    <span>{client.identification}</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="portfolio-card__remove"
+                    onClick={() => removePortfolioClient(client.identification)}
+                    disabled={studyBusyKey === `remove:${client.identification}`}
+                  >
+                    Quitar
+                  </button>
+                </div>
+
+                <div className="portfolio-card__meta">
+                  <span>Prioridad</span>
+                  <select
+                    value={client.priority}
+                    onChange={(event) => {
+                      const priority = event.target.value as Priority;
+                      updatePortfolioClientLocally(client.identification, { priority });
+                      void persistPortfolioClient(client.identification, { priority });
+                    }}
+                    disabled={studyBusyKey === `update:${client.identification}`}
+                  >
+                    <option value="normal">Normal</option>
+                    <option value="vigilar">Vigilar</option>
+                    <option value="urgente">Urgente</option>
+                  </select>
+                  <span>Última consulta</span>
+                  <strong>{formatDateTime(client.lastCheckedAt)}</strong>
+                  <span>Último período</span>
+                  <strong>{client.lastPeriod ? formatPeriod(client.lastPeriod) : "Sin dato"}</strong>
+                  <span>Riesgo detectado</span>
+                  <strong>{client.worstSituation ? getSituationLabel(client.worstSituation) : "Sin dato"}</strong>
+                </div>
+
+                <div className="flags">
+                  <span className={`portfolio-priority portfolio-priority--${client.priority}`}>
+                    {getPriorityLabel(client.priority)}
+                  </span>
+                  <span>{client.entityCount} entidades observadas</span>
+                </div>
+
+                <label className="portfolio-card__notes">
+                  <span>Notas internas</span>
+                  <textarea
+                    value={client.notes}
+                    placeholder="Ej.: volver a revisar al cierre de la jornada, cliente con refinanciación pendiente."
+                    onChange={(event) => updatePortfolioClientLocally(client.identification, {
+                      notes: event.target.value,
+                    })}
+                    onBlur={() => {
+                      void persistPortfolioClient(client.identification, { notes: client.notes });
+                    }}
+                  />
+                </label>
+
+                <div className="portfolio-card__actions">
+                  <button
+                    type="button"
+                    className="recent__chip"
+                    onClick={() => {
+                      void requeryPortfolioClient(client.identification);
+                    }}
+                    disabled={studyBusyKey === `query:${client.identification}`}
+                  >
+                    Reconsultar
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
 
       <footer className="site-footer">
