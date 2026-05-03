@@ -367,6 +367,107 @@ button {
   color: #ffe1e0;
 }
 
+.maintenance-card {
+  margin-top: 1rem;
+  padding: 1.1rem;
+  border-radius: 1.35rem;
+  border: 1px solid rgba(216, 179, 106, 0.2);
+  background:
+    radial-gradient(circle at 20% 20%, rgba(239, 215, 167, 0.2), transparent 28%),
+    radial-gradient(circle at 80% 18%, rgba(96, 211, 148, 0.12), transparent 24%),
+    linear-gradient(135deg, rgba(27, 58, 44, 0.9), rgba(10, 22, 17, 0.92));
+  display: grid;
+  gap: 1rem;
+  overflow: hidden;
+}
+
+.maintenance-card__orbit {
+  position: relative;
+  min-height: 8.5rem;
+  border-radius: 1rem;
+  background:
+    radial-gradient(circle at center, rgba(239, 215, 167, 0.14), transparent 38%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0));
+}
+
+.maintenance-card__coin {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 4.8rem;
+  height: 4.8rem;
+  margin-left: -2.4rem;
+  margin-top: -2.4rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f7e2b8, #d8b36a);
+  color: #173122;
+  font-size: 2rem;
+  font-weight: 900;
+  box-shadow:
+    0 0 0 0.45rem rgba(216, 179, 106, 0.08),
+    0 18px 38px rgba(0, 0, 0, 0.28);
+  animation: drift 4.5s ease-in-out infinite;
+}
+
+.maintenance-card__spark {
+  position: absolute;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 999px;
+  background: rgba(239, 215, 167, 0.9);
+  box-shadow: 0 0 18px rgba(239, 215, 167, 0.42);
+}
+
+.spark-a {
+  top: 1.2rem;
+  left: 24%;
+  animation: blink 2.2s ease-in-out infinite;
+}
+
+.spark-b {
+  top: 5.6rem;
+  right: 21%;
+  width: 0.55rem;
+  height: 0.55rem;
+  animation: blink 1.8s ease-in-out infinite 0.35s;
+}
+
+.spark-c {
+  top: 2.4rem;
+  right: 34%;
+  width: 0.42rem;
+  height: 0.42rem;
+  animation: blink 2.8s ease-in-out infinite 0.7s;
+}
+
+.maintenance-card__copy h3 {
+  margin: 0.7rem 0 0;
+  font-size: clamp(1.5rem, 5vw, 2rem);
+  line-height: 1;
+}
+
+.maintenance-card__copy p {
+  margin: 0.8rem 0 0;
+  color: var(--text-soft);
+  line-height: 1.6;
+}
+
+.maintenance-card__tips {
+  margin-top: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.maintenance-card__tips span {
+  padding: 0.55rem 0.8rem;
+  border-radius: 999px;
+  background: rgba(246, 240, 228, 0.08);
+  color: #fff0cc;
+  font-size: 0.84rem;
+}
+
 .legal-strip {
   margin-top: 1rem;
   padding: 1rem;
@@ -406,12 +507,53 @@ button {
     opacity 160ms ease;
 }
 
+.site-footer {
+  margin-top: 1.2rem;
+  padding-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.site-footer strong {
+  color: #fff0cc;
+  font-weight: 700;
+}
+
 @media (hover: hover) {
   .search-form button:hover,
   .recent__chip:hover,
   .tabs button:hover,
   .secondary-action:hover {
     transform: translateY(-1px);
+  }
+}
+
+@keyframes drift {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-6deg);
+  }
+
+  50% {
+    transform: translateY(-10px) rotate(6deg);
+  }
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.9);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.25);
   }
 }
 

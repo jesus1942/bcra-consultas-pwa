@@ -20,6 +20,7 @@ function App() {
   const [recent, setRecent] = useState<string[]>([]);
   const { loading, error, actual, historica, cheques, identification: queriedId, run } = useBcraQuery();
   const displayName = actual?.denominacion ?? historica?.denominacion ?? cheques?.denominacion ?? null;
+  const isMaintenance = error?.toLowerCase().includes("mantenimiento") ?? false;
 
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY);
@@ -164,7 +165,29 @@ function App() {
           </div>
         ) : null}
 
-        {error ? <div className="empty-state error">{error}</div> : null}
+        {error && isMaintenance ? (
+          <div className="maintenance-card" role="status" aria-live="polite">
+            <div className="maintenance-card__orbit" aria-hidden="true">
+              <span className="maintenance-card__coin">$</span>
+              <span className="maintenance-card__spark spark-a" />
+              <span className="maintenance-card__spark spark-b" />
+              <span className="maintenance-card__spark spark-c" />
+            </div>
+            <div className="maintenance-card__copy">
+              <span className="eyebrow">Pausa Técnica</span>
+              <h3>La bóveda del BCRA está en recreo.</h3>
+              <p>
+                El servicio oficial informó mantenimiento. La app quedó lista para consultar de nuevo
+                apenas el backend vuelva a abrir la ventanilla.
+              </p>
+              <div className="maintenance-card__tips">
+                <span>Probá otra vez en unos minutos.</span>
+                {queriedId ? <span>Consulta pendiente: {queriedId}</span> : null}
+              </div>
+            </div>
+          </div>
+        ) : null}
+        {error && !isMaintenance ? <div className="empty-state error">{error}</div> : null}
         {!error && !actual && !historica && !cheques && !loading ? (
           <div className="empty-state">
             Probá una identificación para cargar la primera consulta y validar la experiencia en pantalla chica.
@@ -303,6 +326,11 @@ function App() {
           </a>
         </div>
       </section>
+
+      <footer className="site-footer">
+        <span>Desarrollado por</span>
+        <strong>Jesus Olguin</strong>
+      </footer>
     </main>
   );
 }
