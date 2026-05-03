@@ -35,6 +35,8 @@ jobs:
         run: npm ci
 
       - name: Build
+        env:
+          VITE_PUBLIC_BASE: /bcra-consultas-pwa/
         run: npm run build
 
       - name: Upload artifact

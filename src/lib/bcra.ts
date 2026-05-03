@@ -6,9 +6,19 @@ import type {
   QueryKind,
 } from "../types/bcra";
 
-const API_BASE =
-  import.meta.env.VITE_BCRA_API_BASE ??
-  (import.meta.env.DEV ? "/api/bcra" : "https://api.bcra.gob.ar");
+function getDefaultApiBase() {
+  if (import.meta.env.DEV) {
+    return "/api/bcra";
+  }
+
+  if (window.location.hostname.endsWith("github.io")) {
+    return "https://api.bcra.gob.ar";
+  }
+
+  return "/api/bcra";
+}
+
+const API_BASE = import.meta.env.VITE_BCRA_API_BASE ?? getDefaultApiBase();
 
 const endpointByKind: Record<QueryKind, string> = {
   actual: "/CentralDeDeudores/v1.0/Deudas",
@@ -36,6 +46,17 @@ function delay(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+function getNetworkErrorMessage() {
+  const isGithubPages = window.location.hostname.endsWith("github.io");
+  const isDirectBcra = API_BASE === "https://api.bcra.gob.ar";
+
+  if (isGithubPages && isDirectBcra) {
+    return "Este despliegue en GitHub Pages no puede consultar directo al BCRA desde el navegador. Hace falta un proxy o backend intermedio.";
+  }
+
+  return "No se pudo conectar con el servicio del BCRA. Probá de nuevo en unos minutos.";
+}
+
 async function requestBcra<T>(kind: QueryKind, identification: string): Promise<T> {
   const cleanIdentification = identification.replace(/\D/g, "");
   const url = `${API_BASE}${endpointByKind[kind]}/${cleanIdentification}`;
@@ -52,7 +73,7 @@ async function requestBcra<T>(kind: QueryKind, identification: string): Promise<
       }
 
       if (error instanceof TypeError) {
-        throw new Error("No se pudo conectar con el servicio del BCRA. Probá de nuevo en unos minutos.");
+        throw new Error(getNetworkErrorMessage());
       }
 
       throw error;

@@ -67,8 +67,8 @@ function bcraDevProxy() {
   };
 }
 
-export default defineConfig(({ mode }) => ({
-  base: mode === "production" ? "/bcra-consultas-pwa/" : "/",
+export default defineConfig(() => ({
+  base: process.env.VITE_PUBLIC_BASE ?? "/",
   plugins: [react(), bcraDevProxy()],
   define: {
     __APP_VERSION__: JSON.stringify(process.env.npm_package_version ?? "0.1.0"),
